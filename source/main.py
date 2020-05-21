@@ -3,8 +3,27 @@ import PyPDF2
 import logging
 logging.basicConfig(level=logging.INFO, format=' %(asctime)s -  %(levelname)s -  %(message)s')
 
+# TODO load config from file: in/out/pages/log folders
 
-def decodename(path):
+# TODO otput errors to file
+
+# TODO output logs to file
+
+# TODO analize pages
+
+# TODO add some interactivity based on page size analizys
+
+
+def decodename(path: Path):
+    """Decodes inserion document name and returns dictionary
+    with page as its key and action dict as value
+
+    Arguments:
+        path {pathlib.Path} -- path do decode it`s name
+
+    Returns:
+        dict -- {page: {"path":, "action":, "rotate":}}
+    """
     name = path.stem
     logging.debug(f'Decoding name {name}')
     operation = {"rotate": 0}
@@ -22,7 +41,7 @@ def decodename(path):
     return {int(name) - 1: operation}
 
 
-def analize_actions():
+def analize_changees():
     changing_pages = {}
     pages = Path("resources/pages")
     pages = pages.glob("*.pdf")
@@ -47,7 +66,7 @@ def do_actions(pdf_file_path, changing_pages):
                 if action["action"] == "add":
                     pdfWriter.addPage(pdfReader.getPage(cur_page))
                 change_reader = PyPDF2.PdfFileReader(action["file"])
-                logging.debug(f'{change_reader.getNumPages()} pages in change_reader of {action["path"].stem}')                    
+                logging.debug(f'{change_reader.getNumPages()} pages in change_reader of {action["path"].stem}')
                 for i in range(change_reader.getNumPages()):
                     page_obj = change_reader.getPage(i)
                     if action["rotate"] != 0:
@@ -64,7 +83,7 @@ def main():
     pdfs = Path(".").resolve() / "resources"
     pdfs = pdfs.glob("*.pdf")
     try:
-        actions = analize_actions()
+        actions = analize_changees()
         for p in pdfs:
             if p.stem.endswith("_edited"):
                 continue
@@ -75,7 +94,7 @@ def main():
             f.write("No")
 
 
-if  __name__ == "__main__":
+if __name__ == "__main__":
     main()
 
 '''
