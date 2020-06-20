@@ -26,7 +26,7 @@ class PDFManipulator(object):
         pages = self.changes_dir.glob("*.pdf")
         for page_path in pages:
             try:
-                changing_pages.update(self.decodename(page_path))
+                changing_pages.update(self.decode_name(page_path))
             except ValueError:
                 with open(self.error_file, "a") as f:
                     f.writelines(f"Неправильный формат имени файла с изменениями: [{page_path.name}]. Он не будет обработан\n")
@@ -35,7 +35,7 @@ class PDFManipulator(object):
             logging.debug(f'Pages [{", ".join([str(x) for x in changing_pages.keys()])}] will be changed')
         return changing_pages
 
-    def decodename(self, path: Path):
+    def decode_name(self, path: Path):
         """Decodes inserion document name and returns dictionary
         with page as its key and action dict as value
 
@@ -47,7 +47,7 @@ class PDFManipulator(object):
         """
         name = path.stem
         p = re.compile("[+]?\d+(r\d{3})?")
-        if p.match(name).group(0) != name:
+        if p.fullmatch(name).group(0) != name:
             raise ValueError("File name is not decodable", name)
         logging.debug(f'Decoding filename [{path.name}]')
         operation = {"rotate": 0}
@@ -63,6 +63,36 @@ class PDFManipulator(object):
 
         logging.debug(f'Operations with {name}: {operation}')
         return {int(name) - 1: operation} # pages numeration starts with 0 in PyPDF2, but with 1 for users
+
+    def decode_pagenum(page_string: str):
+        """Decode Word-like page ranges into list
+
+        Arguments:
+            page_string {str} -- Word-like page string
+        """
+        _x = re.search("[^\d\-, ]", page_string)
+        if _x: # string contains wrong characters
+            logging.debug(f"Wrong symbol in page range string: {page_string} at position {_x.start(0)}")
+            return []
+        pages = []
+        p = re.compile("([123456789]\d* *- *[123456789]\d*)|([123456789]\d*)")
+
+        for m in p.finditer(page_string):
+            if "-" in m[0]:
+                print(m[0])
+                start, end = [int(s) for s in m[0].split("-")]
+                pages.extend(list(range(*[int(s) for s in m[0].split("-")])))
+            else:
+                pages.append(int(m[0]))
+        return pages
+                
+        """if p.match(name).group(0) != name:
+            raise ValueError("File name is not decodable", name)
+        ranges = page_string.split(",")
+        pages = []
+        for r in ranges:
+            if "-" not in r:
+                pages.append(int(r)"""
 
     def apply_changes(self, to_file: Path):
         with open(to_file, "rb") as pdf_file:
@@ -105,7 +135,7 @@ class PDFManipulator(object):
                 opened_files[e].close()
         return pdfWriter
 
-    def manipulate(self):
+    def change_insert(self):
         try:
             if self.changes:
                 for p in self.input_dir.glob("*.pdf"):
@@ -117,10 +147,10 @@ class PDFManipulator(object):
                     self.apply_changes(p)
                 else:
                     with open(self.error_file, "a") as f:
-                        f.writelines(f"Исходные файлы отсуствуют\n")
+                        f.writelines(f"Исходные файлы отсуствуют\n") # FIX THIS WORKS WRONG "NO INPUT FILES EVEN IF THEY ARE"
                         logging.debug(f"No input files")                       
             else:
-                 with open(self.error_file, "a") as f:
+                with open(self.error_file, "a") as f:
                     f.writelines(f"Нет изменений для внесения в исходные файлы\n")
                     logging.debug(f"No proper change files")               
         except IOError as inst:

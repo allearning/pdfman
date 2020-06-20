@@ -8,7 +8,7 @@ logging.basicConfig(level=logging.DEBUG, format=' \
 
 def main():
     man = PDFManipulator(app_conf.read_config())
-    man.manipulate()
+    man.change_insert()
 
 
 if __name__ == "__main__":

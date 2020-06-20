@@ -34,7 +34,7 @@ def read_config(path: Path = Path(__file__).parents[1] / "resources" / "config" 
     """
     config = configparser.ConfigParser()
 
-    config.read(path)
+    config.read([path, Path("conf.ini"), Path("config.ini"), Path("config/conf.ini"), Path("config/config.ini")])
     return config
 
 
