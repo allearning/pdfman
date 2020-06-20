@@ -1,27 +1,30 @@
 from pathlib import Path
+from datetime import datetime
 import PyPDF2
-import logging
 import re
-
-# TODO output logs to file
-
+import my_log
 # TODO analize pages
-
 # TODO add some interactivity based on page size analizys
+# TODO merge Pages
 
 
 class PDFManipulator(object):
     def __init__(self, config):
+        # Logging
+        LOG_FILE = "my_app.log"
+        self.my_logger = my_log.get_logger("PDF_Log", LOG_FILE)
+        # App logic
         self.input_dir = Path(config['Paths']["input folder"])
         self.output_dir = Path(config['Paths']["output folder"])
         self.changes_dir = Path(config['Paths']["changes folder"])
         self.error_file = Path(config['Paths']["error file"])
         self.changes = self.analize_changes()
-        # Logging
-        self.console_handler = logging.StreamHandler()
-        self.file_handler = logging.FileHandler("filename")
-        logging.basicConfig(level=logging.DEBUG, format=' \
-    %(asctime)s -  %(levelname)s -  %(message)s')
+
+    def message(self, text):
+        with open(self.error_file, "a") as f:
+            m = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}: {text}"
+            f.write("".join((m, "\n")))
+        self.my_logger.info(text)
 
     def analize_changes(self):
         changing_pages = {}
@@ -30,11 +33,9 @@ class PDFManipulator(object):
             try:
                 changing_pages.update(self.decode_name(page_path))
             except ValueError:
-                with open(self.error_file, "a") as f:
-                    f.writelines(f"Неправильный формат имени файла с изменениями: [{page_path.name}]. Он не будет обработан\n")
-                    logging.debug(f"Change file {page_path.name} have wrong name format")
+                self.message(f"Неправильный формат имени файла с изменениями: [{page_path.name}]. Он не будет обработан")
         if changing_pages:
-            logging.debug(f'Pages [{", ".join([str(x) for x in changing_pages.keys()])}] will be changed')
+            self.my_logger.debug(f'Pages [{", ".join([str(x) for x in changing_pages.keys()])}] will be changed')
         return changing_pages
 
     def decode_name(self, path: Path):
@@ -51,7 +52,7 @@ class PDFManipulator(object):
         p = re.compile("[+]?\d+(r\d{3})?")
         if p.fullmatch(name).group(0) != name:
             raise ValueError("File name is not decodable", name)
-        logging.debug(f'Decoding filename [{path.name}]')
+        self.my_logger.debug(f'Decoding filename [{path.name}]')
         operation = {"rotate": 0}
         if "r" in name:
             name, angle = name.split("r")
@@ -63,18 +64,18 @@ class PDFManipulator(object):
             operation["action"] = "replace"
         operation["path"] = path
 
-        logging.debug(f'Operations with {name}: {operation}')
+        self.my_logger.debug(f'Operations with {name}: {operation}')
         return {int(name) - 1: operation} # pages numeration starts with 0 in PyPDF2, but with 1 for users
 
-    def decode_pagenum(page_string: str):
+    def decode_pagenum(self, page_string: str):
         """Decode Word-like page ranges into list
 
         Arguments:
             page_string {str} -- Word-like page string
         """
         _x = re.search("[^\d\-, ]", page_string)
-        if _x: # string contains wrong characters
-            logging.debug(f"Wrong symbol in page range string: {page_string} at position {_x.start(0)}")
+        if _x:  # string contains wrong characters
+            self.my_logger.debug(f"Wrong symbol in page range string: {page_string} at position {_x.start(0)}")
             return []
         pages = []
         p = re.compile("([123456789]\d* *- *[123456789]\d*)|([123456789]\d*)")
@@ -101,16 +102,15 @@ class PDFManipulator(object):
             pdfReader = PyPDF2.PdfFileReader(pdf_file)
             pdfWriter = PyPDF2.PdfFileWriter()
             p_num = pdfReader.getNumPages()
-            logging.debug(f"Document {to_file.name} have {p_num} pages")
+            self.my_logger.debug(f"Document {to_file.name} have {p_num} pages")
             opened_files = {}
 
             for e in self.changes:
                 if e > p_num - 1:
-                    with open(self.error_file, "a") as f:
-                        if self.changes[e]["action"] == "add":
-                            f.writelines(f"В документе [{to_file.name}] всего {p_num} страниц(ы) - вставка после {e + 1}-ой страницы из файла [{self.changes[e]['path'].name}] не выполнена\n")
-                        else:
-                            f.writelines(f"В документе [{to_file.name}] всего {p_num} страниц(ы) - {e + 1}-я страница не заменена на страницы из файла [{self.changes[e]['path'].name}]\n")
+                    if self.changes[e]["action"] == "add":
+                        self.message(f"В документе [{to_file.name}] всего {p_num} страниц(ы) - вставка после {e + 1}-ой страницы из файла [{self.changes[e]['path'].name}] не выполнена")
+                    else:
+                        self.message(f"В документе [{to_file.name}] всего {p_num} страниц(ы) - {e + 1}-я страница не заменена на страницы из файла [{self.changes[e]['path'].name}]")
 
             for cur_page in range(p_num):
                 if cur_page not in self.changes:
@@ -122,9 +122,9 @@ class PDFManipulator(object):
                     if action["action"] == "add":
                         pdfWriter.addPage(pdfReader.getPage(cur_page))
                     change_reader = PyPDF2.PdfFileReader(opened_files[cur_page])
-                    logging.debug(f'{change_reader.getNumPages()} pages in {action["path"].name} will be perfomed action {action["action"]} at page {cur_page}')
+                    self.my_logger.debug(f'{change_reader.getNumPages()} pages in {action["path"].name} will be perfomed action {action["action"]} at page {cur_page}')
                     if action["rotate"] != 0:
-                        logging.debug(f'They also will be rotated {action["rotate"]} degrees cw')
+                        self.my_logger.debug(f'They also will be rotated {action["rotate"]} degrees cw')
                     for i in range(change_reader.getNumPages()):
                         page_obj = change_reader.getPage(i)
                         if action["rotate"] != 0:
@@ -140,25 +140,24 @@ class PDFManipulator(object):
     def change_insert(self):
         try:
             if self.changes:
+                files = False
                 for p in self.input_dir.glob("*.pdf"):
-                    logging.debug('--------------------------------------------------------')
-                    logging.debug(f"Working on {p}")
+                    files = True
+                    self.my_logger.debug('--------------------------------------------------------')
+                    self.my_logger.debug(f"Working on {p}")
                     if p.stem.endswith("_edited"):
-                        logging.debug(f"Skipping already processed file {p}")
+                        self.my_logger.debug(f"Skipping already processed file {p}")
                         continue
                     self.apply_changes(p)
-                else:
-                    with open(self.error_file, "a") as f:
-                        f.writelines(f"Исходные файлы отсуствуют\n") # FIX THIS WORKS WRONG "NO INPUT FILES EVEN IF THEY ARE"
-                        logging.debug(f"No input files")                       
+                if not files:
+                    self.message(f"Исходные файлы отсуствуют")
+                    self.my_logger.debug(f"No input files")                       
             else:
-                with open(self.error_file, "a") as f:
-                    f.writelines(f"Нет изменений для внесения в исходные файлы\n")
-                    logging.debug(f"No proper change files")               
+                self.message(f"Нет изменений для внесения в исходные файлы")
+                self.my_logger.debug(f"No proper change files")               
         except IOError as inst:
-            with open(self.error_file, "a") as f:
-                f.write(str(type(inst)))
-                f.write(str(inst.args))
+            self.message(str(type(inst)))
+            self.message(str(inst.args))
 
 
 '''

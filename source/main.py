@@ -1,9 +1,5 @@
 from PDFMan import PDFManipulator
-import logging
 import app_conf
-
-logging.basicConfig(level=logging.DEBUG, format=' \
-    %(asctime)s -  %(levelname)s -  %(message)s')
 
 
 def main():
