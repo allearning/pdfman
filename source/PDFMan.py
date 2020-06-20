@@ -3,9 +3,6 @@ import PyPDF2
 import logging
 import re
 
-logging.basicConfig(level=logging.DEBUG, format=' \
-    %(asctime)s -  %(levelname)s -  %(message)s')
-
 # TODO output logs to file
 
 # TODO analize pages
@@ -20,6 +17,11 @@ class PDFManipulator(object):
         self.changes_dir = Path(config['Paths']["changes folder"])
         self.error_file = Path(config['Paths']["error file"])
         self.changes = self.analize_changes()
+        # Logging
+        self.console_handler = logging.StreamHandler()
+        self.file_handler = logging.FileHandler("filename")
+        logging.basicConfig(level=logging.DEBUG, format=' \
+    %(asctime)s -  %(levelname)s -  %(message)s')
 
     def analize_changes(self):
         changing_pages = {}
