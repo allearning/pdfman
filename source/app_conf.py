@@ -11,6 +11,8 @@ def create_base_config():
     out_path.mkdir(exist_ok=True)
     changes_path = Path(__file__).parents[1] / "resources" / "changes"
     changes_path.mkdir(exist_ok=True)
+    extract_file = changes_path / "remove.txt"
+    extract_file.touch()
     error_file = Path(__file__).parents[1] / "resources" / "errors.txt"
 
     config = configparser.ConfigParser()
