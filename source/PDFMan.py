@@ -73,20 +73,44 @@ class PDFManipulator(object):
         Arguments:
             page_string {str} -- Word-like page string
         """
-        _x = re.search("[^\d\-, ]", page_string)
-        if _x:  # string contains wrong characters
-            self.my_logger.debug(f"Wrong symbol in page range string: {page_string} at position {_x.start(0)}")
-            return []
-        pages = []
-        p = re.compile("([123456789]\d* *- *[123456789]\d*)|([123456789]\d*)")
+        PATTERNS = [
+                        r"(^[123456789]\d* *- *[123456789]\d*$)",
+                        r"(^[123456789]\d*$)"
+                   ]
+        
+        compiled = [re.compile(p) for p in PATTERNS]
 
-        for m in p.finditer(page_string):
-            if "-" in m[0]:
-                print(m[0])
-                start, end = [int(s) for s in m[0].split("-")]
-                pages.extend(list(range(*[int(s) for s in m[0].split("-")])))
-            else:
-                pages.append(int(m[0]))
+        _x = re.findall(r"[^\d\-, ]", page_string)
+        if _x:  # string contains wrong characters
+            self.message(f"Формат номеров страниц не распознан. В строке посторонние символы: {_x}")
+            self.my_logger.debug(f"Wrong symbol in page range string [{page_string}]: {_x}")
+            return []
+
+        ranges = [x.strip() for x in page_string.split(",")]
+        self.my_logger.debug(f'Page diaps [{ranges}]')
+        pages = []
+
+        for r in ranges:
+            found = False
+            for i, pattern in enumerate(compiled):
+                finds = pattern.findall(r)
+                if finds:
+                    found = True
+                    self.my_logger.debug(f"re founded: {pattern}: {finds}")
+                    m = finds[0]
+                    if i == 0:
+                        start, end = [int(s) for s in m.split("-")]
+                        if start >= end:
+                            self.message(f"Формат номеров страниц не распознан. Диапазон страниц задан неверно: {m}")
+                            return []
+                        pages.extend(list(range(start, end + 1)))
+                    elif i == 1:
+                        pages.append(int(m))
+            if not found:
+                self.message(f"Формат номеров страниц не распознан: [{r}]")
+                return []
+        pages = list(set(pages))
+        pages.sort()
         return pages
                 
         """if p.match(name).group(0) != name:
